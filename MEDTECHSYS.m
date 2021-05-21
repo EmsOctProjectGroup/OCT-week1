@@ -5,19 +5,246 @@ FolderName = '~/Desktop/Fr_Gr_5';
 File = fullfile(FolderName, FileName);
 
 load(File);
+%%
+m = mean(mscancut,'all')
+
+for i = 0:111
+    for j = 1:512:512*410001
+        index = i+j;
+        mscancut(index) = m;
+        mscancut(221+j) = m;
+        mscancut(222+j) = m;
+        mscancut(223+j) = m;
+    end
+end
+
 
 %%
 % print loaded data as picture - grayscale
 figure(1)
 colormap gray
+
 image(mscancut)
 
 %%
-image(mscancut(:,6150:13750))
+figure(2)
+colormap gray
+
+mscancut_medfilt = medfilt2(mscancut,[2 2]);
+image(mscancut_medfilt)
 
 %%
-arr = zeros(512,6150,66);
-bscan_start = 6150;
+figure(3)
+colormap gray
+
+c=1;
+while(1)
+    if(c+50000>410001)
+        mscancut_medfilt_imguided(:,c:c+(410001-c)) = imguidedfilter(mscancut_medfilt(:,c:c+(410001-c)));
+        break
+    end
+    mscancut_medfilt_imguided(:,c:c+50000) = imguidedfilter(mscancut_medfilt(:,c:c+50000));
+    c = c+50000;
+end
+
+image(mscancut_medfilt_imguided)
+
+%%
+figure(4)
+colormap gray
+
+matmean = double(mean(mscancut_medfilt_imguided,'all'))
+
+mscancut_medfilt_imguided_contrast = zeros(512,7650);
+for x = 1:512
+    for y = 1:410001
+        if mscancut_medfilt_imguided(x,y) > matmean+14
+            mscancut_medfilt_imguided_contrast(x,y) = mscancut_medfilt_imguided(x,y)+180;
+        else
+            mscancut_medfilt_imguided_contrast(x,y) = mscancut_medfilt_imguided(x,y)-100;
+        end
+    end
+end
+image(mscancut_medfilt_imguided_contrast)
+
+
+%%
+figure(5)
+colormap gray
+mscancut_medfilt_imguided_contrast_gauss = conv2(mscancut_medfilt_imguided_contrast,fspecial('gaussian', [2 2], 1));
+image(mscancut_medfilt_imguided_contrast_gauss)
+
+%%
+figure(6)
+colormap gray
+
+mscancut_medfilt_imguided_contrast_gauss_derived = mscancut_medfilt_imguided_contrast_gauss;
+
+for t = 1:3
+    for x = 1:512*410001-1
+        mscancut_medfilt_imguided_contrast_gauss_derived(x) = mscancut_medfilt_imguided_contrast_gauss_derived(x+1)-mscancut_medfilt_imguided_contrast_gauss_derived(x);
+    end
+end
+
+image(mscancut_medfilt_imguided_contrast_gauss_derived)
+
+%%
+colormap gray
+bscan1 = mscancut_medfilt_imguided_contrast_gauss_derived(:,6150:13750);
+image(bscan1)
+
+%%
+im2 = bscan1;
+
+[nrows, ncols] = size(im2);
+
+increment = 2*pi/7650;
+startAngle = 0;
+
+rho = repmat([1:nrows]',1,ncols);
+
+theta = repmat([startAngle:increment:startAngle + increment*(ncols-1)],nrows,1);
+
+[x,y] = pol2cart(theta, rho);
+
+[zz, xx, yy] = ffgrid(x,y,im2,1,1);
+
+Z = griddata(x,y,im2,xx,yy');
+
+%%
+colormap gray
+image(Z)
+
+%%
+colormap gray
+
+for y = 1:13750-6150
+    for x = 1:512
+        if bscan1(x,y) > 100
+            bscan1(x,y) = 250;
+            for z = x+1:512
+                bscan1(z,y) = 0;
+            end
+        end
+    end
+end
+image(bscan1)
+
+
+%%
+
+for y = 1:13750-6150
+    for x = 1:512
+        if bscan1(x,y) > 80
+            x_tmp(y) = x;
+            y_tmp(y) = y;
+            break
+        end
+    end
+end
+
+plot(y_tmp,-x_tmp,'d')
+
+%%
+
+for x = 1:7390
+   if y_tmp(x) ~= 0
+        curr = x;
+        for y = curr+1:7300
+            if y_tmp(y) ~= 0
+                next = y;
+                if abs(x_tmp(curr)-x_tmp(next)) > abs(x-y)/4 || abs(x_tmp(curr)-x_tmp(next)) > 30
+                    x_tmp(next) = 0;
+                    y_tmp(next) = 0;
+                else
+                    break
+                end 
+            end
+        end
+   end
+end
+
+plot(y_tmp,-x_tmp,'d')
+%%
+
+x_tmp2 = []
+y_tmp2 = []
+
+for c = 1:7392
+    if x_tmp(c) == 0 && y_tmp(c) == 0
+        
+    else
+        x_tmp2(end+1) = x_tmp(c);
+        y_tmp2(end+1) = y_tmp(c);
+    end
+end
+        
+%%
+
+figure (7)
+[p,~,mu] = polyfit(y_tmp2, x_tmp2, 20);
+
+f = polyval(p,y_tmp2,[],mu);
+hold on
+plot(y_tmp2,-f)
+hold off
+
+figure(8)
+
+image(bscan1)
+
+%%
+radius = mean(f)
+
+2*radius
+
+%%
+
+FileName = 'plot_bscan1.bmp';
+FolderName = '~/Desktop/Fr_Gr_5';
+File = fullfile(FolderName, FileName);
+
+picture = imread(File);
+
+%%
+colormap gray
+
+x = f;
+y = y_tmp2;
+
+picture = zeros(400,8000);
+
+
+
+for c = 1:2169
+    if y(c) ~= 0
+        picture(fix(x(c))*y(c)) = 200;
+    end
+end
+
+image(picture)
+
+%%
+colormap gray
+
+new_bscan1 = zeros(512,7287);
+image(new_bscan1)
+
+x_tmp2
+%%
+colormap gray
+
+for c = 1:2178
+    if y_tmp2(c)~=0
+        new_bscan1(y_tmp2(c)*x_tmp2(c)) = 200;
+    end
+end    
+
+image(new_bscan1)
+    
+%%
+%arr = zeros(512,6150,66);
+%bscan_start = 6150;
 %%
 
 bscan_length = 7800;
@@ -28,10 +255,14 @@ bscan_end = (bscan_amount-1)*(bscan_length)
 arr = zeros(512,bscan_length,bscan_amount);
 
 index = 1;
+
+%%
+
 for count = bscan_start:bscan_length:bscan_start+(bscan_amount-1)*bscan_length
     arr(:,:,index) = mscancut(:,count:count+(bscan_length-1));
     index = index+1;
 end
+
 %%
 bscan_amount
 
@@ -39,6 +270,37 @@ bscan_amount
 bscan1 = arr(:,:,1);
 
 image(bscan1)
+
+%%
+
+bscan1_medfil = medfilt2(bscan1,[2 2]);
+image(bscan1_medfil)
+
+%%
+
+sob = fspecial('sobel')
+bscan1_sob = imfilter(bscan1_medfil,sob)
+image(bscan1_sob)
+%image(edge(bscan1,'Prewitt'))
+
+bscan1_double = double(bscan1)
+scaling = @(x)(x-min(x(:)))/(max(x(:))-min(x(:)))
+bscan1_scaleMatrix = scaling(bscan1_double)
+bscan1_scaled = (bscan1_scaleMatrix.^10).*200
+image(bscan1_scaled)
+bscan1_scaled_medfilt = medfilt2(bscan1_scaled, [5 5])
+image(bscan1_scaled_medfilt)
+
+
+%image(edge(bscan1_scaleMatrix,'7canny'))
+
+image(bscan2)
+
+for count = bscan_start:bscan_length:bscan_start+(bscan_amount-1)*bscan_length
+    arr(:,:,index) = mscancut(:,count:count+(bscan_length-1));
+    index = index+1;
+end
+
 
 
 %%
