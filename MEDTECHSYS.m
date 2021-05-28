@@ -8,6 +8,7 @@ load(File);
 %%
 m = mean(mscancut,'all')
 
+% removing artifacts by filling with mean value
 for i = 0:111
     for j = 1:512:512*410001
         index = i+j;
@@ -90,15 +91,35 @@ image(mscancut_medfilt_imguided_contrast_gauss_derived)
 
 %%
 colormap gray
-bscan1 = mscancut_medfilt_imguided_contrast_gauss_derived(:,6150:13750);
-image(bscan1)
+mscancut_length = 410001;
+bscan_length_approx = 9000;
+pos = 1;
+bscans = {};
+count = 1;
+while 1
+    if pos+bscan_length_approx > mscancut_length
+        break;
+    end
+    bscan_tmp = mscancut_medfilt_imguided_contrast_gauss_derived(:,pos:pos+bscan_length_approx);
+    [endPos,bscan] = getBscan(bscan_tmp);
+    pos = pos + endPos;
+    subplot(8,8,count);
+    image(bscan);
+    bscans = [bscans, bscan];
+    count = count + 1;
+end
 
 %%
-im2 = bscan1;
+colormap gray
+image(cell2mat(bscans(4)))
+
+
+%%
+im2 = cell2mat(bscans(55));
 
 [nrows, ncols] = size(im2);
 
-increment = 2*pi/7650;
+increment = 2*pi/ncols;
 startAngle = 0;
 
 rho = repmat([1:nrows]',1,ncols);
@@ -112,13 +133,14 @@ theta = repmat([startAngle:increment:startAngle + increment*(ncols-1)],nrows,1);
 Z = griddata(x,y,im2,xx,yy');
 
 %%
+figure(1)
 colormap gray
 image(Z)
 
 %%
 colormap gray
 
-for y = 1:13750-6150
+for y = 1:bscan1_length
     for x = 1:512
         if bscan1(x,y) > 100
             bscan1(x,y) = 250;
@@ -130,15 +152,14 @@ for y = 1:13750-6150
 end
 image(bscan1)
 
-
 %%
 
-for y = 1:13750-6150
+for y = 1:bscan1_length
     for x = 1:512
         if bscan1(x,y) > 80
             x_tmp(y) = x;
             y_tmp(y) = y;
-            break
+            break;
         end
     end
 end
@@ -147,13 +168,15 @@ plot(y_tmp,-x_tmp,'d')
 
 %%
 
-for x = 1:7390
+[~,l] = size(y_tmp);
+
+for x = 1:l
    if y_tmp(x) ~= 0
         curr = x;
-        for y = curr+1:7300
+        for y = curr+1:l
             if y_tmp(y) ~= 0
                 next = y;
-                if abs(x_tmp(curr)-x_tmp(next)) > abs(x-y)/4 || abs(x_tmp(curr)-x_tmp(next)) > 30
+                if (abs(x_tmp(curr)-x_tmp(next)) > abs(x-y)/4 || abs(x_tmp(curr)-x_tmp(next)) > 30) && next - curr < 400
                     x_tmp(next) = 0;
                     y_tmp(next) = 0;
                 else
@@ -182,7 +205,7 @@ end
 %%
 
 figure (7)
-[p,~,mu] = polyfit(y_tmp2, x_tmp2, 20);
+[p,~,mu] = polyfit(y_tmp2, x_tmp2, 10);
 
 f = polyval(p,y_tmp2,[],mu);
 hold on
@@ -190,7 +213,7 @@ plot(y_tmp2,-f)
 hold off
 
 figure(8)
-
+colormap gray
 image(bscan1)
 
 %%
@@ -812,4 +835,89 @@ end
 
 % Return the segmented area as logical matrix
 J=J>1;
+end
+
+function [endPos,bscan] = getBscan(bscan)
+    [~,length] = size(bscan);
+    for y = 1:length
+        for x = 1:512
+            if bscan(x,y) > 100
+                bscan(x,y) = 250;
+                for z = x+1:512
+                  bscan(z,y) = 0;
+                end
+            end
+        end
+    end
+    
+    for y = 1:length
+        for x = 1:512
+            if bscan(x,y) > 80
+                x_tmp(y) = x;
+                y_tmp(y) = y;
+                break
+            end
+        end
+    end
+    [~,l] = size(y_tmp);
+    for x = 1:l
+        if y_tmp(x) ~= 0
+            curr = x;
+            for y = curr+1:l
+                if y_tmp(y) ~= 0
+                        next = y;
+                        if (abs(x_tmp(curr)-x_tmp(next)) > abs(x-y)/4 || abs(x_tmp(curr)-x_tmp(next)) > 30) && next - curr < 400
+                            x_tmp(next) = 0;
+                            y_tmp(next) = 0;
+                        else
+                            break
+                        end 
+                end
+            end
+            
+        end
+    end
+    
+    x_tmp2 = [];
+    y_tmp2 = [];
+
+    for c = 1:l
+        if x_tmp(c) == 0 && y_tmp(c) == 0
+        
+        else
+            x_tmp2(end+1) = x_tmp(c);
+            y_tmp2(end+1) = y_tmp(c);
+        end
+    end
+        
+    [p,~,mu] = polyfit(y_tmp2, x_tmp2, 20);
+    
+    f = polyval(p,y_tmp2,[],mu);
+    
+    for c = 1:length
+        f_new(c) = interp1(y_tmp2,f,c);
+    end
+
+    
+    y_tmp2 = 1:length;
+    
+    %y_tmp2
+    
+    %plot(y_tmp2,-f_new)
+    
+    endPos = 2000;
+    for c = 2000:length
+        if f_new(endPos) < f_new(c)
+            endPos = c;
+        end
+    end
+    
+    bscan_new = zeros(512,endPos);
+    for c = 2:endPos
+        if fix(-f_new(c)+512*(c-1)) > 0
+            bscan_new(fix(-f_new(c)+512*(c-1))) = 200;
+        end
+    end
+    
+    bscan = imrotate(bscan_new,180);
 end
