@@ -12,6 +12,7 @@ B_off=A-Offset;
 DC =  B_off - mean(B_off,2);
 
 %% Interpolation
+% interpolation=bsxfun(@interp1, DC, Chirp);
 for count = 1:410001
     interpolation(:,count)=interp1(1:1024,DC(:,count),Chirp);
 end
