@@ -4,17 +4,13 @@ File = fullfile(FolderName, FileName);
 fileID = fopen(File);
 A=fread(fileID,[1024,inf],'uint16');
 A=A*540;
-%%
+
+%% Offset
 B_off=A-Offset;
-%%
-mittel=mean(B_off,2);
-%%
-% mittel_rep = repmat(mittel,1,410001);
-%%
-DC =  B_off - repmat(mittel,1,410001);
-%%
-figure(1);
-plot(DC(:,1356));
+
+%% DC-Term entfernen
+DC =  B_off - mean(B_off,2);
+
 %% Interpolation
 for count = 1:410001
     interpolation(:,count)=interp1(1:1024,DC(:,count),Chirp);
