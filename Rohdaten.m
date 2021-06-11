@@ -1,41 +1,52 @@
-FileName = 'phantom1_2_2raw.dat';
-FolderName = 'C:/Users/haina/Downloads/';
-File = fullfile(FolderName, FileName);
+% FileName = 'phantom1_2_2raw.dat';
+% FolderName = 'C:/Users/haina/Downloads/';
+% File = fullfile(FolderName, FileName);
+
 fileID = fopen(File);
 A=fread(fileID,[1024,inf],'uint16');
 A=A*540;
 
 %% Offset
-B_off=A-Offset;
+A=A-Offset;
 
 %% DC-Term entfernen
-DC =  B_off - mean(B_off,2);
+A =  A - mean(A,2);
 
 %% Interpolation
-interpolation=interp1(DC,Chirp);
-
-%%
-subplot(2,1,1);
-plot(DC(:,1));
-subplot(2,1,2);
-plot(interpolation(:,1));
+A=interp1(Chirp,A,0:1023);
 
 %% Hann
 hw = hann(1024);
-multwithhw = interpolation.*hw;
-multwithhw(1,:)=0;
-%%
-plot(multwithhw(:,187));
+A = A.*hw;
 %% Fourier
-fourier=abs(fft(multwithhw));
-compr=20*log10(fourier);
+A=abs(fft(A));
+A=20*log(A);
 
 %%
-compr_mult=fix(compr*2.46);
+A=fix(A*1.069);
+
+function processed = processraw(file,length)
+    fileID = fopen(file);
+    A=fread(fileID,[length,inf],'uint16');
+    A=A*540;
+
+%% Offset
+	A=A-Offset;
+
+%% DC-Term entfernen
+    A =  A - mean(A,2);
+
+%% Interpolation
+    A=interp1(Chirp,A,0:length-1);
+
+%% Hann
+    hw = hann(length);
+    A = A.*hw;
+%% Fourier
+    A=abs(fft(A));
+    A=20*log(A);
+
 %%
-figure(1);
-colormap gray(350);
-image(compr_mult(1:512,:));
-% figure(2);
-% colormap gray(350);
-% image(mscancut);
+    A=fix(A*1.069);
+    processed=A;
+end
